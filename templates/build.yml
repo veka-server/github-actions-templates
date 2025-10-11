@@ -1,13 +1,12 @@
-name: Use Central Docker Build Workflow
+name: Build, Scan & Push Docker Image on Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      reason:
-        description: "Pourquoi vous lancez ce build ?"
-        required: true
-        default: "Manual run"
-
+  release:
+    types: [published]
+  schedule:
+    - cron: "*/5 * * * *"  # toutes les 5 minutes
+  workflow_dispatch:       # permet de lancer manuellement aussi
+        
 jobs:
   call-central:
     uses: veka-server/github-actions-templates/.github/workflows/docker-build.yml@main
