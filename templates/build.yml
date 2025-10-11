@@ -1,0 +1,15 @@
+name: Use Central Docker Build Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Pourquoi vous lancez ce build ?"
+        required: true
+        default: "Manual run"
+
+jobs:
+  call-central:
+    uses: veka-server/github-actions-templates/.github/workflows/docker-build.yml@main
+    secrets:
+      GHCR_PAT: ${{ secrets.GHCR_PAT }}
