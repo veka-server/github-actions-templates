@@ -21,8 +21,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install pynacl requests
 
-      # 2️⃣ Créer le secret GHCR_PAT dans le dépôt cible
-      - name: Create GHCR_PAT secret in target repo
+      # 2️⃣ Créer le secret GHCR_PAT si il n'existe pas
+      - name: Create GHCR_PAT secret if not exists
         env:
           ADMIN_PAT: ${{ secrets.MASTER_PAT }}
           TARGET_REPO: ${{ github.event.inputs.target_repo }}
@@ -38,58 +38,63 @@ jobs:
           secret_value = os.environ["SECRET_VALUE"]
           source_user = os.environ["SOURCE_USER"]
 
-          # 1️⃣ Récupérer la clé publique du dépôt cible
-          url = f"https://api.github.com/repos/{source_user}/{repo}/actions/secrets/public-key"
+          # Vérifier si le secret existe déjà
+          url_list = f"https://api.github.com/repos/{source_user}/{repo}/actions/secrets"
           headers = {"Authorization": f"token {admin_pat}", "Accept": "application/vnd.github+json"}
-          r = requests.get(url, headers=headers)
+          r = requests.get(url_list, headers=headers)
           r.raise_for_status()
-          pubkey = r.json()
-          key_id = pubkey["key_id"]
-          key = pubkey["key"]
+          secrets_list = [s["name"] for s in r.json().get("secrets", [])]
 
-          # 2️⃣ Chiffrer le secret
-          public_key = nacl.public.PublicKey(key.encode("utf-8"), encoder=nacl.encoding.Base64Encoder)
-          sealed_box = nacl.public.SealedBox(public_key)
-          encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
-          encrypted_value = base64.b64encode(encrypted).decode("utf-8")
+          if "GHCR_PAT" in secrets_list:
+              print(f"Secret GHCR_PAT existe déjà dans {repo}, rien à faire.")
+          else:
+              # Récupérer la clé publique du dépôt
+              url_key = f"https://api.github.com/repos/{source_user}/{repo}/actions/secrets/public-key"
+              r = requests.get(url_key, headers=headers)
+              r.raise_for_status()
+              pubkey = r.json()
+              key_id = pubkey["key_id"]
+              key = pubkey["key"]
 
-          # 3️⃣ Créer le secret via API
-          put_url = f"https://api.github.com/repos/{source_user}/{repo}/actions/secrets/GHCR_PAT"
-          data = {"encrypted_value": encrypted_value, "key_id": key_id}
-          r = requests.put(put_url, headers=headers, data=json.dumps(data))
-          r.raise_for_status()
-          print(f"Secret GHCR_PAT créé dans {repo} !")
+              # Chiffrer le secret
+              public_key = nacl.public.PublicKey(key.encode("utf-8"), encoder=nacl.encoding.Base64Encoder)
+              sealed_box = nacl.public.SealedBox(public_key)
+              encrypted = sealed_box.encrypt(secret_value.encode("utf-8"))
+              encrypted_value = base64.b64encode(encrypted).decode("utf-8")
+
+              # Créer le secret
+              put_url = f"https://api.github.com/repos/{source_user}/{repo}/actions/secrets/GHCR_PAT"
+              data = {"encrypted_value": encrypted_value, "key_id": key_id}
+              r = requests.put(put_url, headers=headers, data=json.dumps(data))
+              r.raise_for_status()
+              print(f"Secret GHCR_PAT créé dans {repo} !")
           PYTHON
 
-      # 3️⃣ Copier le workflow template depuis le dépôt central
-      - name: Copy template workflow to target repo
+      # 3️⃣ Copier le workflow template uniquement si le fichier n'existe pas
+      - name: Copy template workflow if not exists
         env:
-          GH_TOKEN: ${{ secrets.MASTER_PAT }}   # Obligatoire pour gh CLI
+          GH_TOKEN: ${{ secrets.MASTER_PAT }}
           TARGET_REPO: ${{ github.event.inputs.target_repo }}
           SOURCE_REPO: ${{ github.repository }}
         run: |
-          # Récupérer le contenu du template
-          FILE_CONTENT=$(gh api repos/$SOURCE_REPO/contents/templates/build.yml \
-                         -q .content | base64 --decode)
+          # Vérifier si le fichier existe déjà
+          FILE_EXISTS=$(gh api repos/$SOURCE_REPO/contents/.github/workflows/use-central.yml \
+                        -q .sha 2>/dev/null || echo "")
 
-          # Re-encoder pour GitHub API
-          CONTENT_BASE64=$(echo "$FILE_CONTENT" | base64 -w 0)
-
-          # Vérifier si le fichier existe déjà et récupérer le sha
-          SHA=$(gh api repos/$SOURCE_REPO/contents/.github/workflows/use-central.yml \
-                -q .sha 2>/dev/null || echo "")
-
-          if [ -n "$SHA" ]; then
-            # Mettre à jour le fichier existant
-            gh api -X PUT \
-              /repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
-              -f message="Update workflow to call central build template" \
-              -f content="$CONTENT_BASE64" \
-              -f sha="$SHA"
+          if [ -n "$FILE_EXISTS" ]; then
+              echo "Le workflow existe déjà dans $TARGET_REPO, rien à faire."
           else
-            # Créer le fichier si il n'existe pas
-            gh api -X PUT \
-              /repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
-              -f message="Add workflow to call central build template" \
-              -f content="$CONTENT_BASE64"
+              # Récupérer le contenu du template
+              FILE_CONTENT=$(gh api repos/$SOURCE_REPO/contents/templates/build.yml \
+                             -q .content | base64 --decode)
+
+              # Re-encoder pour GitHub API
+              CONTENT_BASE64=$(echo "$FILE_CONTENT" | base64 -w 0)
+
+              # Créer le fichier workflow
+              gh api -X PUT \
+                /repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
+                -f message="Add workflow to call central build template" \
+                -f content="$CONTENT_BASE64"
+              echo "Workflow copié dans $TARGET_REPO."
           fi
