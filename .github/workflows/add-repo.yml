@@ -1,0 +1,58 @@
+name: Replicate GHCR_PAT and Add Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: 'Nom du dépôt cible (ex: mon-app)'
+        required: true
+        default: 'mon-app'
+
+jobs:
+  replicate-secret-and-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set variables
+        run: |
+          echo "TARGET_REPO=${{ github.event.inputs.target_repo }}" >> $GITHUB_ENV
+          echo "SOURCE_REPO=${{ github.repository }}" >> $GITHUB_ENV
+
+      # 1️⃣ Récupérer la valeur du secret GHCR_PAT depuis le dépôt central
+      - name: Get GHCR_PAT value
+        id: get_secret
+        run: |
+          SECRET_VALUE=$(gh secret view GHCR_PAT --repo $SOURCE_REPO --json value -q .value)
+          echo "SECRET_VALUE=$SECRET_VALUE" >> $GITHUB_ENV
+
+      # 2️⃣ Ajouter le secret au dépôt cible
+      - name: Set GHCR_PAT in target repo
+        run: |
+          gh secret set GHCR_PAT --repo $TARGET_REPO --body "$SECRET_VALUE"
+
+      # 3️⃣ Créer un workflow minimal qui appelle le workflow central
+      - name: Create child workflow in target repo
+        run: |
+          # Contenu du workflow minimal
+          cat <<EOF > workflow-template.yml
+name: Use Central Workflow
+
+on:
+  workflow_dispatch:
+
+jobs:
+  call-central:
+    uses: $SOURCE_REPO/.github/workflows/docker-build.yml@main
+    secrets:
+      GHCR_PAT: \${{ secrets.GHCR_PAT }}
+EOF
+
+          # Convertir le fichier en base64 pour l'API GitHub
+          CONTENT=$(base64 -w 0 workflow-template.yml)
+
+          # Créer le fichier via API GitHub
+          gh api \
+            -X PUT \
+            -H "Accept: application/vnd.github+json" \
+            /repos/$TARGET_REPO/contents/.github/workflows/use-central.yml \
+            -f message="Add workflow to call central workflow" \
+            -f content="$CONTENT"
