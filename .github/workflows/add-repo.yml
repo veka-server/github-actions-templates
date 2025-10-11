@@ -28,7 +28,6 @@ jobs:
           TARGET_REPO: ${{ github.event.inputs.target_repo }}
           SECRET_VALUE: ${{ github.event.inputs.ghcr_pat }}
           SOURCE_USER: ${{ github.repository_owner }}
-          SOURCE_REPO: ${{ github.repository }}
         run: |
           python - <<'PYTHON'
           import os, requests, json, base64
@@ -65,7 +64,7 @@ jobs:
       # 3️⃣ Copier le workflow template depuis le dépôt central
       - name: Copy template workflow to target repo
         env:
-          ADMIN_PAT: ${{ secrets.MASTER_PAT }}
+          GH_TOKEN: ${{ secrets.MASTER_PAT }}   # Obligatoire pour gh CLI
           TARGET_REPO: ${{ github.event.inputs.target_repo }}
           SOURCE_REPO: ${{ github.repository }}
         run: |
@@ -78,8 +77,6 @@ jobs:
 
           # Créer le workflow dans le dépôt cible
           gh api -X PUT \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: token $ADMIN_PAT" \
             /repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
             -f message="Add workflow to call central build template" \
             -f content="$CONTENT_BASE64"
