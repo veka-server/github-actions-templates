@@ -77,25 +77,17 @@ jobs:
           TARGET_REPO: ${{ github.event.inputs.target_repo }}
           SOURCE_REPO: ${{ github.repository }}
         run: |
-          # Vérifier si le fichier existe déjà dans le dépôt cible
-          FILE_EXISTS=$(gh api repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
-                        -q .sha 2>/dev/null || echo "")
-          
-          if [ -n "$FILE_EXISTS" ]; then
-              echo "Le workflow existe déjà dans $TARGET_REPO, rien à faire."
-          else
-              # Récupérer le contenu du template depuis le dépôt source
-              FILE_CONTENT=$(gh api repos/$SOURCE_REPO/contents/templates/build.yml \
-                             -q .content | base64 --decode)
-          
-              # Re-encoder pour GitHub API
-              CONTENT_BASE64=$(echo "$FILE_CONTENT" | base64 -w 0)
-          
-              # Créer le fichier workflow dans le dépôt cible
-              gh api -X PUT \
-                /repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
-                -f message="Add workflow to call central build template" \
-                -f content="$CONTENT_BASE64"
-              echo "Workflow copié dans $TARGET_REPO."
-          fi
+          # Récupérer le contenu du template depuis le dépôt source
+          FILE_CONTENT=$(gh api repos/$SOURCE_REPO/contents/templates/build.yml \
+                         -q .content | base64 --decode)
+      
+          # Re-encoder pour GitHub API
+          CONTENT_BASE64=$(echo "$FILE_CONTENT" | base64 -w 0)
+      
+          # Créer le fichier workflow dans le dépôt cible
+          gh api -X PUT \
+            /repos/${{ github.repository_owner }}/$TARGET_REPO/contents/.github/workflows/use-central.yml \
+            -f message="Add workflow to call central build template" \
+            -f content="$CONTENT_BASE64"
+          echo "Workflow copié dans $TARGET_REPO."
 
