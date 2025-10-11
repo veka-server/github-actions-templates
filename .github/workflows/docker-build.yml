@@ -1,0 +1,68 @@
+name: Build, Scan & Push Docker Image Reusable
+
+on:
+  workflow_call:
+    secrets:
+      GHCR_PAT:
+        required: true
+  
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout du repo
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # 2️⃣ Log in au registre GitHub Container Registry
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GHCR_PAT }}
+
+      # 3️⃣ Définir les variables d'image dynamiquement
+      - name: Set image tags
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # Si c'est un build programmé, on rebuild le dernier tag (git tag le plus récent)
+            TAG=$(git ls-remote --tags origin | awk -F/ '{print $3}' | sort -V | tail -n1)
+          else
+            # Sinon, on récupère le tag depuis l'événement release
+            TAG=${GITHUB_REF##*/}
+          fi
+          REPO_NAME=${GITHUB_REPOSITORY##*/}
+          IMAGE="ghcr.io/${{ github.repository_owner }}/$REPO_NAME:$TAG"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+
+      # 4️⃣ Build de l'image Docker (no cache)
+      - name: Build Docker image
+        run: |
+          docker build --no-cache -t $IMAGE .
+
+      # 5️⃣ Scan de l'image avec Trivy
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.IMAGE }}
+          format: table
+          exit-code: 1
+          severity: HIGH,CRITICAL
+          vuln-type: os,library
+          ignore-unfixed: false
+          timeout: 5m
+
+      # 6️⃣ Push de l'image
+      - name: Push Docker image
+        run: docker push $IMAGE
+
+      # 7️⃣ Push du tag 'latest' seulement si ce n’est pas un run manuel
+      - name: Push 'latest' tag (skip if manual)
+        if: github.event_name == 'schedule' || github.event_name == 'release'
+        run: |
+          docker tag $IMAGE ghcr.io/${{ github.repository_owner }}/$REPO_NAME:latest
+          docker push ghcr.io/${{ github.repository_owner }}/$REPO_NAME:latest
