@@ -5,6 +5,12 @@ on:
     secrets:
       GHCR_PAT:
         required: true
+    inputs:
+      skip_trivy:
+        description: "Skip Trivy scan"
+        required: false
+        default: 'false'
+        type: string
 
 jobs:
   build:
@@ -51,6 +57,7 @@ jobs:
 
       # 5️⃣ Scan de l'image avec Trivy
       - name: Scan image with Trivy
+        if: ${{ inputs.skip_trivy != 'true' }}
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ env.IMAGE }}
