@@ -37,6 +37,13 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ]; then
             echo "📅 Build programmé détecté"
             TAG=$(git tag | sort -V | tail -n1)
+
+            if [ -z "$TAG" ]; then
+              echo "⚠️ Aucun tag trouvé — arrêt du workflow sans erreur."
+              echo "no_tag_found=true" >> $GITHUB_ENV
+              exit 0
+            fi
+            
             echo "Dernier tag trouvé: $TAG"
             git checkout "tags/$TAG"
           else
