@@ -5,6 +5,8 @@ on:
     secrets:
       GHCR_PAT:
         required: true
+      DISCORD_WEBHOOK_URL:
+        required: true
     inputs:
       skip_trivy:
         description: "Skip Trivy scan"
@@ -21,7 +23,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0  # important pour récupérer tous les tags
+          fetch-depth: 0
 
       # 2️⃣ Log in au registre GitHub Container Registry
       - name: Log in to GitHub Container Registry
@@ -62,9 +64,11 @@ jobs:
       - name: Build Docker image
         run: docker build --no-cache -t $IMAGE .
 
-      # 5️⃣ Scan de l'image avec Trivy
+      # 5️⃣ Scan de l'image avec Trivy (ne stoppe plus le workflow)
       - name: Scan image with Trivy
         if: ${{ inputs.skip_trivy != 'true' }}
+        id: trivy
+        continue-on-error: true
         uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: ${{ env.IMAGE }}
@@ -74,6 +78,18 @@ jobs:
           vuln-type: os,library
           ignore-unfixed: false
           timeout: 5m
+
+      # 5️⃣ bis — Envoi Discord si le scan échoue
+      - name: Send Discord alert if vulnerabilities found
+        if: steps.trivy.outcome == 'failure'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          echo "⚠️ Vulnérabilités détectées, envoi d'une alerte Discord..."
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"username\": \"Trivy Alert\", \"content\": \"🚨 Vulnérabilités détectées dans l'image **${{ env.IMAGE }}** lors du build GitHub Actions !\n🔗 [Voir le run GitHub Actions](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})\"}" \
+               "$DISCORD_WEBHOOK_URL"
 
       # 6️⃣ Push de l'image
       - name: Push Docker image
