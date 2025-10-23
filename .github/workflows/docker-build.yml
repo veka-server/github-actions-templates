@@ -43,7 +43,7 @@ jobs:
             if [ -z "$TAG" ]; then
               echo "⚠️ Aucun tag trouvé — arrêt du workflow sans erreur."
               echo "no_tag_found=true" >> $GITHUB_ENV
-              exit 0
+              exit 78  # ✅ Arrêt neutre, pas d’erreur
             fi
             
             echo "Dernier tag trouvé: $TAG"
