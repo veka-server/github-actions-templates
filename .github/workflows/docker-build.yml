@@ -7,8 +7,6 @@ on:
         required: true
       DISCORD_WEBHOOK_URL:
         required: true
-      # 👇 Permet de recevoir d'autres secrets dynamiquement (optionnel)
-      inherit: true
     inputs:
       skip_trivy:
         description: "Skip Trivy scan"
