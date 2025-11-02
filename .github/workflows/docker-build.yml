@@ -7,13 +7,19 @@ on:
         required: true
       DISCORD_WEBHOOK_URL:
         required: true
+      # 👇 Permet de recevoir d'autres secrets dynamiquement (optionnel)
+      inherit: true
     inputs:
       skip_trivy:
         description: "Skip Trivy scan"
         required: false
         default: 'false'
         type: string
-
+      build_args:
+        description: "Extra Docker build arguments (KEY=VALUE lines)"
+        required: false
+        default: ""
+        type: string
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -64,7 +70,17 @@ jobs:
       # 4️⃣ Build de l'image Docker (no cache)
       - name: Build Docker image
         if: env.no_tag_found != 'true'
-        run: docker build --no-cache -t $IMAGE .
+        run: |
+          echo "${{ inputs.build_args }}" > build_args.txt
+          EXTRA_ARGS=""
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            EXTRA_ARGS="$EXTRA_ARGS --build-arg $line"
+          done < build_args.txt
+      
+          echo "🔧 Building image with args: $EXTRA_ARGS"
+          docker build --no-cache $EXTRA_ARGS -t $IMAGE .
+
 
       # 5️⃣ Scan de l'image avec Trivy (ne stoppe plus le workflow)
       - name: Scan image with Trivy
