@@ -7,17 +7,15 @@ on:
         required: true
       DISCORD_WEBHOOK_URL:
         required: true
+      build_args:
+        required: false
     inputs:
       skip_trivy:
         description: "Skip Trivy scan"
         required: false
         default: 'false'
         type: string
-      build_args:
-        description: "Extra Docker build arguments (KEY=VALUE lines)"
-        required: false
-        default: ""
-        type: string
+
 jobs:
   build:
     runs-on: ubuntu-latest
