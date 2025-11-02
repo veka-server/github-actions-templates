@@ -7,8 +7,6 @@ on:
         required: true
       DISCORD_WEBHOOK_URL:
         required: true
-      build_args:
-        required: false
     inputs:
       skip_trivy:
         description: "Skip Trivy scan"
@@ -26,6 +24,14 @@ jobs:
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      # Récupérer l'artifact du parent
+      - name: Download custom data artifact
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: custom_data
+          path: ./custom_data
 
       # 2️⃣ Log in au registre GitHub Container Registry
       - name: Log in to GitHub Container Registry
