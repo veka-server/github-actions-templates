@@ -66,16 +66,8 @@ jobs:
       # 4️⃣ Build de l'image Docker (no cache)
       - name: Build Docker image
         if: env.no_tag_found != 'true'
-        run: |
-          echo "${{ inputs.build_args }}" > build_args.txt
-          EXTRA_ARGS=""
-          while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            EXTRA_ARGS="$EXTRA_ARGS --build-arg $line"
-          done < build_args.txt
-      
-          echo "🔧 Building image with args: $EXTRA_ARGS"
-          docker build --no-cache $EXTRA_ARGS -t $IMAGE .
+        run: docker build --no-cache -t $IMAGE .
+
 
 
       # 5️⃣ Scan de l'image avec Trivy (ne stoppe plus le workflow)
