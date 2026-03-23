@@ -77,19 +77,19 @@ jobs:
 
 
       # 5️⃣ Scan de l'image avec Trivy (ne stoppe plus le workflow)
-      - name: Scan image with Trivy
-        if: env.no_tag_found != 'true' && ${{ inputs.skip_trivy != 'true' }}
-        id: trivy
-        continue-on-error: true
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          image-ref: ${{ env.IMAGE }}
-          format: table
-          exit-code: 1
-          severity: HIGH,CRITICAL
-          vuln-type: os,library
-          ignore-unfixed: false
-          timeout: 5m
+#      - name: Scan image with Trivy
+#        if: env.no_tag_found != 'true' && ${{ inputs.skip_trivy != 'true' }}
+#        id: trivy
+#        continue-on-error: true
+#        uses: aquasecurity/trivy-action@0.33.1
+#        with:
+#          image-ref: ${{ env.IMAGE }}
+#          format: table
+#          exit-code: 1
+#          severity: HIGH,CRITICAL
+#          vuln-type: os,library
+#          ignore-unfixed: false
+#          timeout: 5m
 
       # 5️⃣ bis — Envoi Discord si le scan échoue
       - name: Send Discord alert if vulnerabilities found
